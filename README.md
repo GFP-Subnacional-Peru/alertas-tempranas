@@ -1,50 +1,45 @@
 # Alertas tempranas de deforestación
 
-Visor de las alertas tempranas de deforestación en las Áreas de Conservación Regional. Lo usa el programa GFP Subnacional para mirar el aviso, clasificarlo y dejar el reporte.
+Lectura técnica de las alertas de pérdida de bosque que GeoBosques publica dentro de las Áreas de Conservación Regional. El polígono lo produce el Ministerio del Ambiente. Este visor sirve para interpretarlo, contrastarlo con imagen satelital y, cuando corresponde, constatarlo en campo.
 
 En línea: https://acr-atd.onrender.com/
-Salud del servicio: `GET /api/atd/salud`
 
-## Qué hace
+## Método
 
-El visor abre el territorio por región, ámbito, ACR y periodo. Cada alerta se ve sobre el mapa, con su código y su fecha.
+La unidad de trabajo es la alerta ya publicada: un polígono con código, fecha de imagen y territorio (región, ámbito, ACR y periodo). El sistema no genera ese polígono ni lo sustituye.
 
-Quien consulta recorre las alertas. Quien entra con usuario las clasifica, adjunta la foto de campo y cierra el reporte. La foto guarda la coordenada en UTM: si el celular trae ubicación, el visor la lee y la escribe. El par de imágenes Sentinel, una de antes y una de después, ayuda a leer el cambio. El reporte en PDF lo arma el especialista. La propuesta automática no reemplaza esa decisión ni se guarda sola.
+La interpretación usa Sentinel-2, nivel L2A, del catálogo Earth Search. Para cada alerta se buscan dos escenas alrededor de la fecha de detección: una anterior y una posterior, con un tope de nubosidad. Ese par orienta la lectura. El reporte oficial guarda las escenas que el especialista elige.
 
-## Cómo está hecho
+La clasificación la decide la persona. Puede haber una sugerencia automática de clase, causa y confianza; esa sugerencia no se graba sola y no reemplaza el criterio del especialista. El polígono de trabajo sigue siendo el de GeoBosques. Si se edita el contorno, queda registrado como edición de ese polígono.
 
-El servicio es Java 21 con Spring Boot. La base es PostGIS 16, esquema `atd`, y el esquema entra por migraciones Flyway. El visor es HTML, CSS y JavaScript con Leaflet. Las claves de los usuarios viven en variables de entorno, no en el código.
+La constatación de campo adjunta una fotografía. La coordenada se guarda en UTM. Si el archivo trae la ubicación del celular, el visor la lee y reemplaza el centro de la alerta.
 
-La imagen se construye con el `Dockerfile` de esta raíz: Maven compila dentro de la imagen y el servicio arranca con el puerto que le asigna la publicación. Un push a `main` actualiza el visor cuando el servicio apunta a este repositorio.
+La capa de Global Forest Watch es una referencia visual del año en curso, de enero a la fecha, recortada al ACR y a su zona de influencia. No entra a la bandeja de clasificación ni al PDF.
 
-## Carpetas
+El informe reúne la ubicación, el mapa, el par de imágenes, la clase asignada y la afectación. La fotografía de campo va en el reporte de constatación.
 
-| Carpeta | Para qué está |
+## Repositorio
+
+| Carpeta | Contenido |
 | --- | --- |
-| `src/main/java` | API, sesión, clasificación, fotos y PDF. |
-| `src/main/resources/static` | Visor: `index.html`, `visor.js` y los límites del mapa. |
-| `src/main/resources/db/migration` | Migraciones Flyway del esquema `atd`. |
-| `db/carga` | Carga inicial desde las GDB. No entra en la imagen. |
-| `Dockerfile` | Imagen del servicio. El contexto de construcción es esta raíz. |
-| `.github/workflows/` | Mantiene el servicio despierto en el horario de trabajo. |
+| `src/main/java` | API, sesión, clasificación, fotografías y PDF. |
+| `src/main/resources/static` | Visor y límites del mapa. |
+| `src/main/resources/db/migration` | Esquema `atd` en PostGIS, por migraciones Flyway. |
+| `db/carga` | Carga inicial desde las geodatabases. No entra en la imagen. |
+| `Dockerfile` | Imagen del servicio. Java 21. El contexto es esta raíz. |
 
-## Horario
+Las claves de acceso no están en el código. Se leen de variables de entorno. El archivo `.env` no se versiona; `.env.example` solo nombra las variables, vacías.
 
-De lunes a viernes, de 8:00 a 18:00, hora de Lima. GitHub Actions llama a `GET /api/atd/salud` desde las 7:50, para que a las 8 el visor ya responda, y deja de llamar a las 18. A esa hora el servicio se apaga solo. La computadora de quien desarrolla no tiene que estar prendida: el aviso corre en GitHub.
+Cada cambio que entra a `main` queda en este repositorio.
 
-Hay dos workflows, `keep-render-awake.yml` y `keep-render-awake-offset.yml`. El segundo va desfasado unos minutos por si el primero se atrasa. Los dos cubren el mismo horario.
-
-## Correr en local
-
-Hace falta Docker Desktop y un archivo `.env`. Se copia `.env.example` y se completan los usuarios. Sin ese archivo nadie puede entrar.
+Para correrlo en esta computadora hace falta Docker Desktop y un `.env` copiado desde `.env.example`, con los usuarios completos.
 
 ```
 docker compose up -d --build
 ```
 
-El visor queda en http://localhost:8081/
-En Windows también abre `ABRIR_ATD_LOCAL.bat`.
+El visor queda en http://localhost:8081/. En Windows también abre `ABRIR_ATD_LOCAL.bat`.
 
-La base local escucha en el puerto 5433, base `atd`, usuario `atd`. La clave es `ATD_DB_PASSWORD` del `.env`.
+La base local es PostGIS 16, puerto 5433, base `atd`, usuario `atd`. Su clave es `ATD_DB_PASSWORD` del `.env`.
 
 La carga de límites lee `acr_all.geojson` y `zi_all.geojson` desde `ATD_LIMITES_DIR` (por defecto `db/limites/`, carpeta que no se versiona).
