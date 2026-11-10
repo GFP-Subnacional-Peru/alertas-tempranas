@@ -1,0 +1,16 @@
+target/
+.env
+.env.*
+!.env.example
+db/gdb/
+db/gdb_loreto/
+db/escenas/
+db/limites/
+drive-sa.json
+drive-oauth.json
+client_secret*.json
+*.tif
+*.zip
+.idea/
+.vscode/
+*.log

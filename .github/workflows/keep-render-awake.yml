@@ -1,0 +1,27 @@
+# Lunes a viernes, 8:00–18:00 hora de Lima (UTC−5).
+# 12:50 UTC = 7:50 Lima, para que a las 8 ya esté despierto.
+# 13:00–22:55 UTC = 8:00–17:55 Lima.
+name: Keep Render awake
+
+on:
+  schedule:
+    - cron: "50,55 12 * * 1-5"
+    - cron: "*/5 13-22 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping alertas
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -fsS -o /tmp/health.json -w "%{http_code}" --max-time 180 \
+              "https://acr-atd.onrender.com/api/atd/salud" || echo "000")
+            echo "intento $i — HTTP $code"
+            cat /tmp/health.json 2>/dev/null || true
+            echo
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 15
+          done
+          exit 1

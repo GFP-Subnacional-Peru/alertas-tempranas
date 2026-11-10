@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alertas Tempranas de Deforestación · ACR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel="stylesheet" href="/visor.css?v=20261109g">
+<script>
+  try { if (localStorage.getItem('atd-tema') === 'oscuro') document.documentElement.dataset.tema = 'oscuro'; } catch (e) {}
+</script>
+</head>
+<body>
+
+<nav class="rail">
+  <span class="rail-marca"><img src="/img/gfp.png" alt="GFP Subnacional"></span>
+  <button class="rail-btn activo" data-modo="consulta" title="Consulta de alertas"><i class="fas fa-map-location-dot"></i><span>Consulta</span></button>
+  <button class="rail-btn" data-modo="clasificar" title="Clasificación de alertas (validadores)" hidden><i class="fas fa-satellite"></i><span>Clasificar</span><b id="badge-pend" class="rail-badge" hidden></b></button>
+  <button class="rail-btn" id="btn-entrar" title="Ingresar para editar"><i class="fas fa-user-lock"></i><span>Entrar</span></button>
+  <button class="rail-btn" id="btn-tema" title="Tema claro u oscuro"><i class="fas fa-circle-half-stroke"></i><span>Tema</span></button>
+  <button class="rail-btn" id="btn-acerca" title="Acerca del sistema"><i class="fas fa-circle-info"></i><span>Acerca</span></button>
+  <div class="rail-usuario rail-abajo" id="rail-usuario" hidden>
+    <span class="rail-avatar" id="usr-inicial"></span>
+    <small id="usr-nombre"></small>
+    <form method="post" action="/logout" id="form-salir">
+      <input type="hidden" name="_csrf" id="salir-csrf">
+      <button class="rail-btn" type="submit" title="Cerrar sesión"><i class="fas fa-right-from-bracket"></i><span>Salir</span></button>
+    </form>
+  </div>
+  <button class="rail-btn" id="btn-panel" title="Ocultar panel"><i class="fas fa-angles-left"></i></button>
+</nav>
+
+<aside class="panel" id="panel">
+  <header class="panel-cab">
+    <img class="cab-logo" src="/img/gfp.png" alt="GFP Subnacional">
+    <div>
+      <h1>Alertas Tempranas de Deforestación</h1>
+      <p id="cab-sub">Consulta de alertas</p>
+    </div>
+  </header>
+
+  <div class="sync" id="sync">
+    <span class="sync-punto"></span>
+    <div>
+      <strong id="sync-titulo">Conectando con GeoBosques…</strong>
+      <small id="sync-detalle"></small>
+    </div>
+  </div>
+
+  <!-- ===================== MODO CONSULTA ===================== -->
+  <section id="modo-consulta">
+    <ol class="pasos" id="pasos">
+      <li data-paso="1" class="activo"><b>1</b><span>Territorio</span></li>
+      <li data-paso="2" class="bloq"><b>2</b><span>Resumen</span></li>
+      <li data-paso="3" class="bloq"><b>3</b><span>Alertas</span></li>
+      <li data-paso="4" class="bloq"><b>4</b><span>Evidencia</span></li>
+      <li data-paso="5" class="bloq"><b>5</b><span>Reporte</span></li>
+    </ol>
+
+    <div class="cuerpo">
+      <!-- Paso 1 -->
+      <div class="paso" data-paso="1">
+        <div class="mb-tabs" id="mb-tabs">
+          <button type="button" data-tab="filtros" class="activo">Filtros</button>
+          <button type="button" data-tab="capas">Capas</button>
+        </div>
+        <div id="mb-filtros">
+          <div class="mb-modo" id="mb-modo">
+            <button type="button" data-v="simple" class="activo">Simples</button>
+            <button type="button" data-v="detallado">Detallado</button>
+          </div>
+          <p class="etq">Territorio</p>
+          <label class="etq">Departamento</label>
+          <select id="f-region" class="mb-sel" aria-label="Departamento"></select>
+          <label class="etq">Ámbito de conservación</label>
+          <select id="f-ambito" class="mb-sel" aria-label="Ámbito de conservación">
+            <option value="ambos">ACR + zona de influencia</option>
+            <option value="acr">Solo ACR</option>
+            <option value="zi">Solo zona de influencia</option>
+          </select>
+          <label class="etq">Área de conservación regional</label>
+          <select id="f-acr" class="mb-sel" aria-label="Área de conservación regional"></select>
+          <label class="etq">Lógica de la búsqueda</label>
+          <div class="mb-radios">
+            <label><input type="radio" name="f-por" value="codigo" checked> Cód. de la alerta</label>
+            <label><input type="radio" name="f-por" value="territorio"> Territorio</label>
+          </div>
+          <div class="mb-busca">
+            <input id="f-texto" type="search" placeholder="LOR-2026-0205" autocomplete="off">
+            <button type="button" id="f-lupa" title="Buscar"><i class="fas fa-magnifying-glass"></i></button>
+          </div>
+          <label class="etq">Periodo <small>(mes de la imagen satelital)</small></label>
+          <div class="mb-cal" id="f-cal">
+            <div class="mb-cal-nav">
+              <button type="button" id="f-anio-prev" aria-label="Año anterior"><i class="fas fa-chevron-left"></i></button>
+              <strong id="f-anio-lbl">—</strong>
+              <button type="button" id="f-anio-next" aria-label="Año siguiente"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <div class="mb-cal-meses" id="f-cal-meses" role="group" aria-label="Meses de enero a diciembre"></div>
+          </div>
+          <p class="mb-cal-rango"><span id="f-desde-lbl">Enero</span> – <span id="f-hasta-lbl">Diciembre</span></p>
+          <p class="ayuda">Pulse el mes de inicio y después el mes de cierre. Las flechas cambian el año.</p>
+          <input type="hidden" id="f-desde" value="0">
+          <input type="hidden" id="f-hasta" value="0">
+          <p class="ayuda">Las imágenes se buscan en Sentinel-2 L2A, catálogo Earth Search, con la fecha de la alerta y un tope de nubes. Es el mismo criterio que Earth Explorer.</p>
+          <div id="mb-det" hidden>
+            <label class="etq">Tamaño de la alerta (ha)</label>
+            <div class="mb-rango-etiq"><span id="f-ha-min-lbl">0</span><span id="f-ha-max-lbl">500</span></div>
+            <div class="mb-slider">
+              <input type="range" id="f-ha-min" min="0" max="500" value="0" step="0.5" aria-label="Hectáreas mínimas">
+              <input type="range" id="f-ha-max" min="0" max="500" value="500" step="0.5" aria-label="Hectáreas máximas">
+            </div>
+            <label class="etq">Tipo de deforestación</label>
+            <select id="f-resultado" class="mb-sel">
+              <option value="todas">Todas</option>
+              <option value="antropica">Pérdida antrópica</option>
+              <option value="natural">Cambio natural</option>
+              <option value="falsa">Falsa alerta</option>
+              <option value="pendiente">Pendiente</option>
+            </select>
+            <label class="etq">Tipo de alerta</label>
+            <select id="f-estado" class="mb-sel">
+              <option value="todas">Todas</option>
+              <option value="pendiente">Sin constatar</option>
+              <option value="validada">Ya clasificada</option>
+              <option value="constatada">Constatada en campo</option>
+            </select>
+            <label class="etq">Causa</label>
+            <select id="f-causa" class="mb-sel"><option value="">Todas</option></select>
+            <label class="etq">Orden</label>
+            <select id="f-orden" class="mb-sel">
+              <option value="ha">Superficie, de mayor a menor</option>
+              <option value="fecha">Fecha de la imagen</option>
+              <option value="codigo">Código</option>
+            </select>
+          </div>
+          <p class="vacio-mini" id="f-error" hidden></p>
+          <div class="mb-acciones">
+            <button class="btn-sec" id="f-reset" type="button">RESETAR</button>
+            <button class="btn-pri" id="ir-2" type="button">BUSCAR</button>
+          </div>
+        </div>
+        <div id="mb-capas" hidden>
+          <p class="ayuda">La capa de GeoBosques muestra el año en curso, en vivo. GFW muestra solo el 2026, de enero a hoy, recortado al ACR y a la zona de influencia: no entra a la bandeja ni al reporte.</p>
+          <label class="mb-check"><input type="checkbox" id="f-c-poli" checked> Perturbación (polígono rojo)</label>
+          <label class="mb-check"><input type="checkbox" id="f-c-alertas" checked> Centros de alerta</label>
+          <label class="mb-check"><input type="checkbox" id="f-c-propuesta"> Contorno automático · Loreto</label>
+          <label class="mb-check"><input type="checkbox" id="f-c-geob"> ATD GeoBosques 2026 <small>(oficial, en vivo)</small></label>
+          <label class="mb-check"><input type="checkbox" id="f-c-gfw"> GFW · perturbación 2026 <small>(enero a hoy, ACR y zona de influencia)</small></label>
+          <label class="mb-check"><input type="checkbox" id="f-c-limites" checked> Límites ACR / ZI</label>
+          <label class="mb-check"><input type="checkbox" id="f-c-exa"> Cuadrícula EXA</label>
+          <label class="mb-check"><input type="checkbox" id="f-c-zon"> Zonificación</label>
+          <label class="mb-check"><input type="checkbox" id="f-c-sec"> Sectores</label>
+          <label class="etq">Mapa base</label>
+          <select id="f-base" class="mb-sel">
+            <option value="esri">Imagen satelital</option>
+            <option value="s2026">Sentinel-2 2026</option>
+            <option value="s2">Sentinel-2 sin nubes 2024</option>
+            <option value="topo">Topográfico</option>
+            <option value="gris">Gris</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Paso 2 -->
+      <div class="paso" data-paso="2" hidden>
+        <h2 id="res-titulo">Resumen</h2>
+        <p class="ayuda">Lectura mensual del monitoreo. Las hectáreas solo consideran alertas ya validadas.</p>
+        <div class="kpis">
+          <div class="kpi"><span>Alertas recibidas</span><strong id="k-total">–</strong><em id="k-total-var"></em></div>
+          <div class="kpi"><span>Alertas validadas</span><strong id="k-valid">–</strong><em id="k-valid-sub"></em></div>
+          <div class="kpi rojo"><span>Pérdida antrópica</span><strong id="k-antr">–</strong><em id="k-antr-var"></em></div>
+          <div class="kpi azul"><span>Cambio natural</span><strong id="k-nat">–</strong><em id="k-nat-sub"></em></div>
+        </div>
+        <div class="tarjeta">
+          <h3>Resultado de las alertas del mes</h3>
+          <div class="barra-apilada" id="barra-res"></div>
+          <div class="leyenda-mini" id="leyenda-res"></div>
+        </div>
+        <div class="tarjeta">
+          <h3>Alertas por mes · <span id="graf-anio"></span></h3>
+          <div class="graf-meses" id="graf-meses"></div>
+          <div class="graf-leyenda" id="graf-leyenda"></div>
+          <div class="fila-btn">
+            <button class="btn-sec" id="mostrar-todo" type="button">Mostrar todo</button>
+            <button class="btn-sec" id="btn-comunicado" type="button">Comunicado de alertas nuevas</button>
+          </div>
+        </div>
+        <div class="tarjeta" id="tarjeta-equipo">
+          <h3>Equipo del ACR</h3>
+          <p class="ayuda">Personas a las que se les pide la fotointerpretación. El cargo es el que sale en el PDF de la alerta. No son cuentas de ingreso al visor.</p>
+          <div id="equipo"></div>
+          <form id="form-equipo" hidden>
+            <input id="eq-nombre" maxlength="150" placeholder="Nombre" required>
+            <input id="eq-cargo" maxlength="120" placeholder="Cargo" required>
+            <button class="btn-pri" type="submit">Agregar</button>
+          </form>
+        </div>
+        <div class="tarjeta" id="tarjeta-labor">
+          <h3>Labor de monitoreo</h3>
+          <p class="ayuda">Seguimiento del especialista en el mes de cierre del periodo: cuántas clasificó y cuántas ya están constatadas en campo.</p>
+          <div id="labor"></div>
+        </div>
+        <div class="tarjeta" id="tarjeta-causas">
+          <h3>Pérdida antrópica por causal</h3>
+          <div id="causas"></div>
+        </div>
+        <button class="btn-pri" id="ir-3">Ver alertas del mes <i class="fas fa-arrow-right"></i></button>
+      </div>
+
+      <!-- Paso 3 -->
+      <div class="paso" data-paso="3" hidden>
+        <h2>Alertas del periodo</h2>
+        <p class="ayuda">"Validada" significa que la alerta ya fue revisada técnicamente. Las pendientes aún no muestran clasificación.</p>
+        <div class="filtros-res" id="filtros-res"></div>
+        <div class="lista" id="lista"></div>
+      </div>
+
+      <!-- Paso 4 -->
+      <div class="paso" data-paso="4" hidden>
+        <div class="cab-alerta">
+          <div><h2 id="ev-codigo">–</h2><p class="ayuda" id="ev-sub"></p></div>
+          <span class="chip" id="ev-chip"></span>
+        </div>
+        <div id="ev-comparador"></div>
+        <div class="escena-mapa" id="ev-escena" hidden>
+          <span><i class="fas fa-satellite"></i> Imagen en el mapa</span>
+          <div class="segmento" id="ev-escena-sel">
+            <button data-v="" class="activo">Ninguna</button>
+            <button data-v="antes">Antes</button>
+            <button data-v="despues">Después</button>
+          </div>
+        </div>
+        <div class="tarjeta editor" id="ed-panel" hidden>
+          <h3><i class="fas fa-draw-polygon"></i> Edición del polígono</h3>
+          <p class="ayuda">Use la imagen Sentinel-2 de fondo como guía. En <b>Vértices</b>, arrastre los puntos; los puntos intermedios agregan vértices y el clic derecho los quita. <b>Eliminar vector</b> quita el contorno para dibujar otro. <b>Original</b> vuelve al polígono de la GDB.</p>
+          <div class="ed-herr" id="ed-herr">
+            <button data-h="vertices"><i class="fas fa-bezier-curve"></i> Vértices</button>
+            <button data-h="mover"><i class="fas fa-up-down-left-right"></i> Mover</button>
+            <button data-h="rotar"><i class="fas fa-rotate"></i> Rotar</button>
+            <button id="ed-menos" title="Reducir 5 %"><i class="fas fa-compress"></i></button>
+            <button id="ed-mas" title="Agrandar 5 %"><i class="fas fa-expand"></i></button>
+          </div>
+          <div class="ed-area">Superficie: <b id="ed-ha">–</b> <small id="ed-orig"></small></div>
+          <div class="fila-btn">
+            <button class="btn-sec" id="ed-eliminar" type="button"><i class="fas fa-trash"></i> Eliminar vector</button>
+            <button class="btn-sec" id="ed-cancelar" type="button">Cancelar</button>
+            <button class="btn-sec" id="ed-restaurar" type="button" hidden><i class="fas fa-clock-rotate-left"></i> Original</button>
+            <button class="btn-pri" id="ed-guardar" type="button"><i class="fas fa-check"></i> Guardar</button>
+          </div>
+        </div>
+        <div class="ficha" id="ev-ficha"></div>
+        <aside class="propuesta-red" id="ev-red" hidden>
+          <i class="fas fa-eye"></i>
+          <div>
+            <span>Propuesta de la red</span>
+            <b id="ev-red-txt"></b>
+            <small>Lectura automática del recorte Sentinel. No reemplaza la clasificación del especialista.</small>
+          </div>
+        </aside>
+        <div class="campo" id="ev-campo">
+          <h3><i class="fas fa-camera"></i> Reporte sobre constatación de deforestación</h3>
+          <p class="ayuda">La carga de la foto de campo es la corroboración de la alerta. Cada imagen lleva sus coordenadas UTM y una descripción de lo que se ve. Si la foto del celular trae ubicación, se lee sola.</p>
+          <div class="fotos" id="ev-fotos"></div>
+          <form id="form-foto" hidden>
+            <input id="foto-archivo" type="file" accept="image/jpeg,image/png,image/webp" required>
+            <div class="dos-coord utm-coord">
+              <input id="foto-zona" maxlength="3" placeholder="18S" aria-label="Zona UTM" autocomplete="off">
+              <input id="foto-este" inputmode="numeric" placeholder="Este" aria-label="Este UTM" autocomplete="off">
+              <input id="foto-norte" inputmode="numeric" placeholder="Norte" aria-label="Norte UTM" autocomplete="off">
+            </div>
+            <p class="ayuda" id="foto-utm-nota"></p>
+            <input id="foto-nota" maxlength="250" placeholder="Descripción: trocha, chacra, madera…">
+            <button class="btn-pri" type="submit"><i class="fas fa-upload"></i> Subir foto</button>
+          </form>
+          <p class="ayuda" id="foto-entrar">Entra con usuario de editor para subir la foto de la patrulla.</p>
+        </div>
+        <div class="nota" id="ev-conclusion" hidden></div>
+        <div class="fila-btn">
+          <button class="btn-sec" id="ev-volver"><i class="fas fa-list"></i> Volver a la lista</button>
+          <button class="btn-sec" id="ir-const" type="button"><i class="fas fa-camera"></i> Reporte de constatación</button>
+          <button class="btn-pri" id="ir-5">Generar reporte <i class="fas fa-file-pdf"></i></button>
+        </div>
+      </div>
+
+      <!-- Paso 5 -->
+      <div class="paso" data-paso="5" hidden>
+        <h2>Reporte sobre alerta de deforestación</h2>
+        <p class="ayuda">El PDF de la alerta: ubicación, mapa, imágenes Sentinel-2 antes y después, datos de monitoreo, afectación y producción. La foto de campo va en el reporte de constatación.</p>
+        <div class="reporte-prev" id="rep-prev"></div>
+        <button class="btn-pri" id="rep-descargar"><i class="fas fa-download"></i> Descargar PDF</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== MODO CLASIFICAR ===================== -->
+  <section id="modo-clasificar" hidden>
+    <div class="cuerpo">
+      <details class="guia" id="cl-guia" open>
+        <summary>Qué hace cada cosa</summary>
+        <p>Esta bandeja revisa, una por una, las alertas que ya publicó GeoBosques. El sistema no dibuja el polígono: lo trae el MINAM. La persona mira las imágenes y decide.</p>
+        <ul>
+          <li><b>Antes.</b> El bosque de referencia, en la fecha anterior.</li>
+          <li><b>Después.</b> La imagen reciente, en color real. Este par es el que sale en el PDF.</li>
+          <li><b>SWIR.</b> La misma fecha reciente. El suelo sin bosque se ve magenta. Sirve para no confundir un río, una sombra o un derrumbe con una tala.</li>
+          <li><b>Contorno naranja.</b> El polígono de la alerta, en hectáreas, con la fecha de la imagen.</li>
+          <li><b>Pérdida antrópica (A).</b> Alguien tumbó bosque. Hay que elegir la causa.</li>
+          <li><b>Cambio natural (N).</b> Río, derrumbe o muerte de árboles.</li>
+          <li><b>Falsa alerta (F).</b> Nube, sombra o un cambio que no es pérdida.</li>
+          <li><b>En duda (U).</b> Se deja pendiente y pasa a la siguiente.</li>
+          <li><b>La red.</b> Si hay recorte, al abrir la alerta deja marcado el resultado, la causa y la confiabilidad. Enter guarda esa lectura. El polígono sigue siendo el de GeoBosques.</li>
+          <li><b>Guardar.</b> La decisión queda en la base. Si cierra el navegador, sigue clasificada.</li>
+        </ul>
+      </details>
+      <div class="sel-compacta">
+        <select id="cl-region" aria-label="Región"></select>
+        <select id="cl-ambito" aria-label="Ámbito">
+          <option value="ambos">ACR + zona de influencia</option>
+          <option value="acr">Solo dentro del ACR</option>
+          <option value="zi">Solo zona de influencia</option>
+        </select>
+        <select id="cl-acr" aria-label="ACR"></select>
+        <select id="cl-mes" aria-label="Periodo"></select>
+      </div>
+      <div id="cl-ultimo" class="nota" hidden></div>
+      <div id="cl-cola-cab" class="cola-cab"></div>
+      <div class="cola" id="cl-cola"></div>
+
+      <div id="cl-form" hidden>
+        <div class="cab-alerta">
+          <div><h2 id="cl-codigo">–</h2><p class="ayuda" id="cl-sub"></p><p class="ayuda" id="cl-codigo-nota"></p>
+            <aside class="propuesta-red" id="cl-red" hidden>
+              <i class="fas fa-eye"></i>
+              <div>
+                <span>Propuesta de la red</span>
+                <b id="cl-red-txt"></b>
+                <small>Sugerencia para esta alerta. Guardar sigue siendo la decisión del especialista.</small>
+              </div>
+            </aside>
+          </div>
+          <button class="btn-icono" id="cl-cerrar" title="Volver a la bandeja"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div id="cl-comparador"></div>
+        <p class="ayuda" id="cl-mapa-nota">La imagen Sentinel de después se pone en el mapa. El polígono se edita ahí.</p>
+        <button class="btn-sec btn-editar" id="cl-editar" type="button" hidden><i class="fas fa-draw-polygon"></i> Editar polígono en el mapa</button>
+        <div id="cl-editor"></div>
+        <label class="etq">Resultado <small>(teclas A · N · F)</small></label>
+        <div class="opciones-res" id="cl-resultado">
+          <button data-v="antropica" class="op rojo"><i class="fas fa-tree"></i> Pérdida antrópica <kbd>A</kbd></button>
+          <button data-v="natural" class="op azul"><i class="fas fa-water"></i> Cambio natural <kbd>N</kbd></button>
+          <button data-v="falsa" class="op gris"><i class="fas fa-ban"></i> Falsa alerta <kbd>F</kbd></button>
+        </div>
+        <div id="cl-bloque-causa" hidden>
+          <label class="etq">Causal <small>(dominio CausaDeforestacion)</small></label>
+          <div class="causas-grid" id="cl-causas"></div>
+        </div>
+        <div class="dos-col">
+          <div><label class="etq">Confiabilidad</label><div class="segmento" id="cl-conf"></div></div>
+          <div><label class="etq">Tipo de bosque</label><div class="segmento" id="cl-bosque"></div></div>
+        </div>
+        <label class="etq">Especialista que clasifica</label>
+        <input id="cl-especialista" type="text" maxlength="80" placeholder="Nombre y apellido" autocomplete="name">
+        <label class="etq">Conclusión técnica <small>se imprime en el reporte PDF, en la sección Conclusión técnica</small></label>
+        <textarea id="cl-conclusion" rows="3" placeholder="Ej.: Se observa remoción de cobertura boscosa entre ambas fechas, con patrón de chacra…"></textarea>
+        <div class="fila-btn">
+          <button class="btn-sec" id="cl-saltar">En duda <kbd>U</kbd></button>
+          <button class="btn-pri" id="cl-guardar" disabled><i class="fas fa-check"></i> Guardar y siguiente <kbd>Enter</kbd></button>
+        </div>
+      </div>
+    </div>
+  </section>
+</aside>
+
+<main id="mapa"></main>
+
+<div class="capas" id="capas">
+  <button class="capas-btn" id="capas-btn" title="Capas"><i class="fas fa-layer-group"></i></button>
+  <div class="capas-cuerpo oculto" id="capas-cuerpo">
+    <h4>Capas</h4>
+    <label><input type="checkbox" id="c-poli" checked> <i class="sw sw-poli"></i> Perturbación (polígono rojo)</label>
+    <label><input type="checkbox" id="c-alertas" checked> <i class="sw sw-alerta"></i> Centros de alerta</label>
+    <label><input type="checkbox" id="c-geob"> <i class="sw sw-geob"></i> <span>ATD GeoBosques 2026 <small>oficial, en vivo</small></span></label>
+    <label><input type="checkbox" id="c-gfw"> <i class="sw sw-gfw"></i> <span>GFW · perturbación 2026 <small>enero a hoy, ACR y zona de influencia</small></span></label>
+    <label><input type="checkbox" id="c-limites" checked> <i class="sw sw-lim"></i> Límites ACR / ZI</label>
+    <label><input type="checkbox" id="c-exa"> <i class="sw sw-exa"></i> Cuadrícula EXA</label>
+    <label><input type="checkbox" id="c-zon"> <i class="sw sw-zon"></i> Zonificación</label>
+    <label><input type="checkbox" id="c-sec"> <i class="sw sw-sec"></i> Sectores</label>
+    <label><input type="checkbox" id="c-propuesta"> <i class="sw sw-prop"></i> Contorno automático · Loreto</label>
+    <h4>Mapa base</h4>
+    <label><input type="radio" name="base" value="esri" checked> Imagen satelital</label>
+    <label><input type="radio" name="base" value="s2026"> Sentinel-2 2026 <small>(actual, nubes ≤ 30 %)</small></label>
+    <label><input type="radio" name="base" value="s2"> Sentinel-2 sin nubes 2024</label>
+    <label><input type="radio" name="base" value="topo"> Topográfico</label>
+    <label><input type="radio" name="base" value="gris"> Gris</label>
+  </div>
+</div>
+
+<div id="escena-fija" class="escena-fija" hidden></div>
+
+<div class="leyenda" id="leyenda">
+  <p class="ley-grupo">Alertas</p>
+  <div><i class="borde" style="border-color:#e53935"></i><span>Perturbación</span></div>
+  <div><i style="background:#1e88e5"></i><span>Cambio natural</span></div>
+  <div><i style="background:#9e9e9e"></i><span>Falsa alerta</span></div>
+  <div><i style="background:#fb8c00"></i><span>Pendiente</span></div>
+  <div><i class="punto" style="background:#fb8c00"></i><span>Centro de la alerta</span></div>
+  <div><i class="borde punteado" style="border-color:#e8b931"></i><span>Contorno automático</span></div>
+  <p class="ley-grupo">Territorio</p>
+  <div><i class="borde" style="border-color:#2ecc40"></i><span>ACR</span></div>
+  <div><i class="borde" style="border-color:#b0b6ba"></i><span>Zona de influencia</span></div>
+  <div class="ley-exa" hidden><i class="borde" style="border-color:#111"></i><span>Cuadrícula EXA</span></div>
+  <div class="ley-zon" hidden><i class="borde grueso" style="border-color:#111"></i><span>Zonificación</span></div>
+  <div class="ley-sec" hidden><i class="borde punteado" style="border-color:#111"></i><span>Sectores</span></div>
+  <p class="ley-grupo ley-vivo" hidden>En vivo</p>
+  <div class="ley-gfw" hidden><i style="background:#e31a1c"></i><span>GFW · 2026, enero a hoy</span></div>
+  <div class="ley-geob" hidden><i style="background:#ff00c5"></i><span>GeoBosques · última semana</span></div>
+  <div class="ley-geob" hidden><i style="background:#0066ff"></i><span>GeoBosques · acumulado</span></div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<dialog id="dlg-tutorial">
+  <div class="dlg-marca"><img src="/img/gfp.png" alt="GFP Subnacional"><span>GFP Subnacional</span></div>
+  <h3>Cómo se lee una alerta</h3>
+  <p class="tut-lead">El sistema no inventa el polígono. Trae lo que publicó GeoBosques y la persona decide qué es.</p>
+  <div class="tut-pasos">
+    <div class="tut-paso"><i class="fas fa-map-location-dot"></i><div><b>Mapa.</b> El punto es el centro. El polígono rojo es la perturbación de la alerta: se apaga para ver el bosque y se prende para ver el límite. La línea ámbar, apagada al entrar, es un contorno automático solo de Loreto. No es la alerta.</div></div>
+    <div class="tut-paso"><i class="fas fa-images"></i><div><b>Tres imágenes.</b> Antes, después y SWIR. Un clic abre el deslizador: arrastra la barra para ver el cambio.</div></div>
+    <div class="tut-paso"><i class="fas fa-satellite"></i><div><b>SWIR.</b> La misma fecha reciente. El suelo sin bosque se ve magenta. Sirve para no confundir un río, una sombra o un derrumbe con una tala.</div></div>
+    <div class="tut-paso"><i class="fas fa-check"></i><div><b>Clasificar.</b> A es pérdida antrópica, N es cambio natural, F es falsa alerta. U deja la alerta en duda. Guardar escribe la decisión en la base.</div></div>
+  </div>
+  <label class="tut-siempre"><input type="checkbox" id="tut-siempre" checked> Mostrar esta guía al entrar</label>
+  <form method="dialog"><button class="btn-pri" id="tut-cerrar" value="ok">Entendido</button></form>
+</dialog>
+
+<dialog id="dlg-fotos" class="dlg-fotos">
+  <div class="dlg-fotos-bar">
+    <div class="dlg-fotos-modo" id="fotos-modo">
+      <button type="button" data-m="rgb">Antes / Después</button>
+      <button type="button" data-m="swir" id="fotos-swir">Antes / SWIR</button>
+      <button type="button" id="fotos-contorno" class="activo">Contorno</button>
+    </div>
+    <form method="dialog"><button class="dlg-fotos-x" value="cancel" aria-label="Cerrar"><i class="fas fa-xmark"></i></button></form>
+  </div>
+  <div id="fotos-lienzo"></div>
+  <p class="dlg-fotos-nota" id="fotos-nota">Arrastra la barra para comparar. Contorno muestra u oculta el polígono de la alerta.</p>
+</dialog>
+
+<dialog id="dlg-acerca">
+  <div class="dlg-marca"><img src="/img/gfp.png" alt="GFP Subnacional"><span>GFP Subnacional</span></div>
+  <h3>Sistema de Alertas Tempranas de Deforestación</h3>
+  <p>Monitoreo de las Áreas de Conservación Regional de Loreto, San Martín y Cusco.</p>
+  <ul>
+    <li><b>Consulta:</b> mira alertas, evidencias y el reporte. No clasifica.</li>
+    <li><b>Clasificador:</b> el especialista revisa el antes, el después y el SWIR, y guarda pérdida antrópica, cambio natural o falsa alerta. La decisión queda en la base.</li>
+    <li><b>En duda:</b> la alerta sigue pendiente para volver a verla.</li>
+    <li><b>Alertas:</b> GeoBosques (MINAM) · semana vigente <span id="acerca-semana">–</span>.</li>
+    <li><b>Código de trabajo</b> (LOR-2026-0570): prefijo de región, año de la imagen e identificador de origen. Vale para pendientes y para ya clasificadas. El código del PDF es el de la GDB (por ejemplo ACR10-2026-084).</li>
+    <li><b>Evidencia:</b> Sentinel-2 L2A (Copernicus / Element84). El par del reporte es el guardado. En la alerta se puede buscar otro día en el catálogo.</li>
+    <li><b>Límites:</b> ACR y Zonas de Influencia del dashboard GFP Subnacional.</li>
+  </ul>
+  <div class="fila-btn">
+    <button class="btn-sec" type="button" id="acerca-guia">Ver la guía</button>
+    <form method="dialog"><button class="btn-pri">Entendido</button></form>
+  </div>
+</dialog>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.min.js"></script>
+<script src="/visor.js?v=20261109i"></script>
+</body>
+</html>
