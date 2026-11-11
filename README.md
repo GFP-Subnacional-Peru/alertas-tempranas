@@ -2,7 +2,7 @@
 
 Lectura técnica de las alertas de pérdida de bosque que GeoBosques publica dentro de las Áreas de Conservación Regional. El polígono lo produce el Ministerio del Ambiente. Este visor sirve para interpretarlo, contrastarlo con imagen satelital y, cuando corresponde, constatarlo en campo.
 
-En línea: https://acr-atd.onrender.com/
+En línea: https://www.gfpsubnacional.pe/sistema-de-alertas-tempranas-de-deforestacion/
 
 ## Método
 
